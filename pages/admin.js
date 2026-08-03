@@ -221,11 +221,11 @@ export default function Admin() {
             <tbody>
               {leaders.map((l) => (
                 <tr key={l.id}>
-                  <td>{l.nombre}</td>
-                  <td>{l.email}</td>
-                  <td>{jovenes.filter((j) => j.leader_id === l.id).length}</td>
+                  <td data-label="Nombre">{l.nombre}</td>
+                  <td data-label="Correo">{l.email}</td>
+                  <td data-label="# Jóvenes">{jovenes.filter((j) => j.leader_id === l.id).length}</td>
                   <td>
-                    <div className="actions">
+                    <div className="row-actions">
                       <button className="btn-secondary" onClick={() => openEditLeader(l)}>Editar</button>
                       <button className="btn-danger" onClick={() => handleDeleteLeader(l)}>Eliminar</button>
                     </div>
@@ -264,10 +264,10 @@ export default function Admin() {
             <tbody>
               {jovenes.map((j) => (
                 <tr key={j.id}>
-                  <td>{j.nombre}</td>
-                  <td>{leaderMap[j.leader_id]?.nombre || "—"}</td>
-                  <td>{j.sistema_usuario}</td>
-                  <td>
+                  <td data-label="Nombre">{j.nombre}</td>
+                  <td data-label="Líder">{leaderMap[j.leader_id]?.nombre || "—"}</td>
+                  <td data-label="Usuario">{j.sistema_usuario}</td>
+                  <td data-label="Contraseña">
                     <div className="pw-cell">
                       <span>{visiblePw[j.id] ? j.sistema_password : "••••••••"}</span>
                       <button className="btn-link" onClick={() => togglePw(j.id)}>
@@ -276,7 +276,7 @@ export default function Admin() {
                     </div>
                   </td>
                   <td>
-                    <div className="actions">
+                    <div className="row-actions">
                       <button className="btn-secondary" onClick={() => openEditJoven(j)}>Editar</button>
                       <button className="btn-danger" onClick={() => handleDeleteJoven(j.id)}>Eliminar</button>
                     </div>

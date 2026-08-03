@@ -96,6 +96,7 @@ th { color: #6b7280; font-size: 12px; text-transform: uppercase; }
 .pw-cell { display: flex; align-items: center; gap: 8px; font-family: monospace; }
 
 .actions { display: flex; gap: 8px; }
+.row-actions { display: flex; gap: 8px; }
 
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(0,0,0,0.35);
@@ -107,3 +108,107 @@ th { color: #6b7280; font-size: 12px; text-transform: uppercase; }
 .form-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
 
 .empty-state { text-align: center; padding: 40px 0; color: #6b7280; }
+
+/* ============ Responsivo (móvil) ============ */
+
+@media (max-width: 640px) {
+  .container {
+    padding: 16px 12px 48px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  h1 { font-size: 19px; }
+  h2 { font-size: 16px; }
+
+  /* La barra superior (título + botones) pasa de fila a columna */
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .topbar > button {
+    width: 100%;
+  }
+
+  /* Grupos de botones (ej. "+ Agregar" + "Cerrar sesión") apilados
+     y a todo lo ancho, para que sean fáciles de tocar */
+  .actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .actions button {
+    width: 100%;
+  }
+
+  /* Los botones de una fila de tabla (Editar/Eliminar) se quedan uno
+     junto al otro pero repartiendo el ancho disponible */
+  .row-actions button {
+    flex: 1;
+  }
+
+  /* Botones más grandes para facilitar el toque en pantallas táctiles */
+  button {
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+  input, textarea, select {
+    padding: 12px;
+    font-size: 16px; /* evita zoom automático en iOS al enfocar */
+  }
+
+  /* Tablas: de layout de filas/columnas a tarjetas apiladas */
+  table, thead, tbody, tr, td {
+    display: block;
+    width: 100%;
+  }
+  thead { display: none; }
+  table { margin-top: 4px; }
+  tr {
+    background: #fff;
+    border: 1px solid #eef0f2;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+  }
+  td {
+    border: none;
+    padding: 8px 0;
+  }
+  td:not(:last-child) {
+    border-bottom: 1px dashed #f0f1f3;
+  }
+  td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #9ca3af;
+    margin-bottom: 4px;
+  }
+
+  /* Modales a pantalla casi completa, con scroll si el formulario es largo */
+  .modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal {
+    max-width: 100%;
+    width: 100%;
+    max-height: 92vh;
+    overflow-y: auto;
+    border-radius: 16px 16px 0 0;
+    padding: 20px;
+  }
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+  .form-actions button {
+    width: 100%;
+  }
+}

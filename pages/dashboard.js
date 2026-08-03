@@ -144,9 +144,9 @@ export default function Dashboard() {
             <tbody>
               {jovenes.map((j) => (
                 <tr key={j.id}>
-                  <td>{j.nombre}</td>
-                  <td>{j.sistema_usuario}</td>
-                  <td>
+                  <td data-label="Nombre">{j.nombre}</td>
+                  <td data-label="Usuario del sistema">{j.sistema_usuario}</td>
+                  <td data-label="Contraseña">
                     <div className="pw-cell">
                       <span>{visiblePw[j.id] ? j.sistema_password : "••••••••"}</span>
                       <button className="btn-link" onClick={() => togglePw(j.id)}>
@@ -154,9 +154,9 @@ export default function Dashboard() {
                       </button>
                     </div>
                   </td>
-                  <td>{j.notas || "—"}</td>
+                  <td data-label="Notas">{j.notas || "—"}</td>
                   <td>
-                    <div className="actions">
+                    <div className="row-actions">
                       <button className="btn-secondary" onClick={() => openEdit(j)}>Editar</button>
                       <button className="btn-danger" onClick={() => handleDelete(j.id)}>Eliminar</button>
                     </div>
