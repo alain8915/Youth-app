@@ -1,46 +1,45 @@
-import { requireUser, isAdmin } from "../../../lib/supabaseServer";
+import { requireUser } from "../../../lib/supabaseServer";
 import { encrypt } from "../../../lib/crypto";
 
 export default async function handler(req, res) {
   const auth = await requireUser(req, res);
   if (!auth) return;
-  const { supabase, user } = auth;
-  const admin = isAdmin(user);
+  const { supabase } = auth;
   const { id } = req.query;
 
   if (req.method === "PUT") {
-    const { nombre, sistema_usuario, sistema_password, notas, leader_id } = req.body || {};
+    const { nombre, sistema_usuario, sistema_password, notas, barrio_id } = req.body || {};
 
-    if (!nombre?.trim() || !sistema_usuario?.trim() || !sistema_password?.trim()) {
-      return res.status(400).json({ error: "Nombre, usuario y contraseña son obligatorios." });
-    }
-
-    const updates = {
-      nombre: nombre.trim(),
-      sistema_usuario: sistema_usuario.trim(),
-      sistema_password_encriptado: encrypt(sistema_password),
-      notas: notas?.trim() || null,
-    };
-
-    // Solo el admin puede reasignar un joven a otro líder. Si un líder
-    // manda leader_id, se ignora (además RLS lo bloquearía de todas formas).
-    if (admin && leader_id) {
-      updates.leader_id = leader_id;
+    if (!nombre?.trim() || !sistema_usuario?.trim() || !sistema_password?.trim() || !barrio_id) {
+      return res.status(400).json({ error: "Nombre, usuario, contraseña y Barrio son obligatorios." });
     }
 
     const { data, error } = await supabase
       .from("jovenes")
-      .update(updates)
+      .update({
+        barrio_id,
+        nombre: nombre.trim(),
+        sistema_usuario: sistema_usuario.trim(),
+        sistema_password_encriptado: encrypt(sistema_password),
+        notas: notas?.trim() || null,
+      })
       .eq("id", id)
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      const sinPermiso = /row-level security/i.test(error.message || "");
+      return res.status(sinPermiso ? 403 : 500).json({
+        error: sinPermiso
+          ? "No tienes permiso para mover jóvenes a ese Barrio."
+          : error.message,
+      });
+    }
     if (!data) return res.status(404).json({ error: "No encontrado" });
 
     return res.status(200).json({
       id: data.id,
-      leader_id: data.leader_id,
+      barrio_id: data.barrio_id,
       nombre: data.nombre,
       sistema_usuario: data.sistema_usuario,
       sistema_password,

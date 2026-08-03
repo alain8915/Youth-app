@@ -1,15 +1,14 @@
-import { requireUser, isAdmin } from "../../../lib/supabaseServer";
+import { requireUser } from "../../../lib/supabaseServer";
 import { encrypt, decrypt } from "../../../lib/crypto";
 
 export default async function handler(req, res) {
   const auth = await requireUser(req, res);
   if (!auth) return;
-  const { supabase, user } = auth;
-  const admin = isAdmin(user);
+  const { supabase } = auth;
 
   if (req.method === "GET") {
-    // Si es líder, RLS ya filtra para devolver solo sus jóvenes.
-    // Si es admin, la política admin_full_access permite ver todos.
+    // RLS filtra automáticamente: un líder ve solo los jóvenes de los
+    // Barrios a los que está asignado; el admin ve todos.
     const { data, error } = await supabase
       .from("jovenes")
       .select("*")
@@ -19,7 +18,7 @@ export default async function handler(req, res) {
 
     const jovenes = data.map((j) => ({
       id: j.id,
-      leader_id: j.leader_id,
+      barrio_id: j.barrio_id,
       nombre: j.nombre,
       sistema_usuario: j.sistema_usuario,
       sistema_password: decrypt(j.sistema_password_encriptado),
@@ -31,26 +30,16 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
-    const { nombre, sistema_usuario, sistema_password, notas, leader_id } = req.body || {};
+    const { nombre, sistema_usuario, sistema_password, notas, barrio_id } = req.body || {};
 
-    if (!nombre?.trim() || !sistema_usuario?.trim() || !sistema_password?.trim()) {
-      return res.status(400).json({ error: "Nombre, usuario y contraseña son obligatorios." });
-    }
-
-    // Un líder siempre crea jóvenes bajo su propia cuenta. Un admin debe
-    // indicar explícitamente a qué líder pertenece el nuevo joven.
-    let targetLeaderId = user.id;
-    if (admin) {
-      if (!leader_id) {
-        return res.status(400).json({ error: "Selecciona a qué líder pertenece este joven." });
-      }
-      targetLeaderId = leader_id;
+    if (!nombre?.trim() || !sistema_usuario?.trim() || !sistema_password?.trim() || !barrio_id) {
+      return res.status(400).json({ error: "Nombre, usuario, contraseña y Barrio son obligatorios." });
     }
 
     const { data, error } = await supabase
       .from("jovenes")
       .insert({
-        leader_id: targetLeaderId,
+        barrio_id,
         nombre: nombre.trim(),
         sistema_usuario: sistema_usuario.trim(),
         sistema_password_encriptado: encrypt(sistema_password),
@@ -59,11 +48,19 @@ export default async function handler(req, res) {
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      // RLS bloquea insertar en un Barrio al que el líder no está asignado.
+      const sinPermiso = /row-level security/i.test(error.message || "");
+      return res.status(sinPermiso ? 403 : 500).json({
+        error: sinPermiso
+          ? "No tienes permiso para agregar jóvenes a ese Barrio."
+          : error.message,
+      });
+    }
 
     return res.status(201).json({
       id: data.id,
-      leader_id: data.leader_id,
+      barrio_id: data.barrio_id,
       nombre: data.nombre,
       sistema_usuario: data.sistema_usuario,
       sistema_password,

@@ -1,23 +1,43 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
+import { useEscapeClose } from "../lib/useEscapeClose";
+import { useToast } from "../lib/useToast";
+import Toast from "../components/Toast";
+import ConfirmDialog from "../components/ConfirmDialog";
 
-const emptyLeaderForm = { nombre: "", email: "", password: "" };
-const emptyJovenForm = { nombre: "", sistema_usuario: "", sistema_password: "", notas: "", leader_id: "" };
+const emptyLeaderForm = { nombre: "", email: "", password: "", barrio_id: "" };
+const emptyBarrioForm = { nombre: "" };
+const emptyJovenForm = { nombre: "", sistema_usuario: "", sistema_password: "", notas: "", barrio_id: "" };
 
 export default function Admin() {
   const router = useRouter();
   const [session, setSession] = useState(undefined);
   const [leaders, setLeaders] = useState([]);
+  const [barrios, setBarrios] = useState([]);
+  const [asignaciones, setAsignaciones] = useState([]);
   const [jovenes, setJovenes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [visiblePw, setVisiblePw] = useState({});
+  const [confirmState, setConfirmState] = useState({ open: false });
+
+  const { toast, showToast, clearToast } = useToast();
 
   const [leaderModalOpen, setLeaderModalOpen] = useState(false);
   const [editingLeaderId, setEditingLeaderId] = useState(null);
   const [leaderForm, setLeaderForm] = useState(emptyLeaderForm);
   const [savingLeader, setSavingLeader] = useState(false);
+
+  const [barrioModalOpen, setBarrioModalOpen] = useState(false);
+  const [editingBarrioId, setEditingBarrioId] = useState(null);
+  const [barrioForm, setBarrioForm] = useState(emptyBarrioForm);
+  const [savingBarrio, setSavingBarrio] = useState(false);
+
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [assigningLeader, setAssigningLeader] = useState(null);
+  const [assignBarrioId, setAssignBarrioId] = useState("");
+  const [assigning, setAssigning] = useState(false);
 
   const [jovenModalOpen, setJovenModalOpen] = useState(false);
   const [editingJovenId, setEditingJovenId] = useState(null);
@@ -36,6 +56,11 @@ export default function Admin() {
     });
   }, [router]);
 
+  useEscapeClose(leaderModalOpen, () => setLeaderModalOpen(false));
+  useEscapeClose(barrioModalOpen, () => setBarrioModalOpen(false));
+  useEscapeClose(assignModalOpen, () => setAssignModalOpen(false));
+  useEscapeClose(jovenModalOpen, () => setJovenModalOpen(false));
+
   const authHeader = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return { Authorization: `Bearer ${session?.access_token}`, "Content-Type": "application/json" };
@@ -45,13 +70,19 @@ export default function Admin() {
     setLoading(true);
     setError("");
     const headers = await authHeader();
-    const [leadersRes, jovenesRes] = await Promise.all([
+    const [leadersRes, barriosRes, asignacionesRes, jovenesRes] = await Promise.all([
       fetch("/api/admin/leaders", { headers }),
+      fetch("/api/admin/barrios", { headers }),
+      fetch("/api/admin/asignaciones", { headers }),
       fetch("/api/jovenes", { headers }),
     ]);
     if (leadersRes.ok) setLeaders(await leadersRes.json());
+    if (barriosRes.ok) setBarrios(await barriosRes.json());
+    if (asignacionesRes.ok) setAsignaciones(await asignacionesRes.json());
     if (jovenesRes.ok) setJovenes(await jovenesRes.json());
-    if (!leadersRes.ok || !jovenesRes.ok) setError("No se pudo cargar toda la información.");
+    if (!leadersRes.ok || !barriosRes.ok || !asignacionesRes.ok || !jovenesRes.ok) {
+      setError("No se pudo cargar toda la información.");
+    }
     setLoading(false);
   }, [authHeader]);
 
@@ -59,28 +90,100 @@ export default function Admin() {
     if (session) loadAll();
   }, [session, loadAll]);
 
-  const leaderMap = useMemo(() => {
+  const barrioMap = useMemo(() => {
     const map = {};
-    leaders.forEach((l) => (map[l.id] = l));
+    barrios.forEach((b) => (map[b.id] = b));
     return map;
-  }, [leaders]);
+  }, [barrios]);
+
+  const leaderBarriosMap = useMemo(() => {
+    const map = {};
+    asignaciones.forEach((a) => {
+      if (!map[a.leader_id]) map[a.leader_id] = [];
+      map[a.leader_id].push({ barrio_id: a.barrio_id, nombre: a.barrio_nombre });
+    });
+    return map;
+  }, [asignaciones]);
+
+  function closeConfirm() {
+    setConfirmState({ open: false });
+  }
+
+  async function handleConfirm() {
+    const action = confirmState.onConfirm;
+    closeConfirm();
+    if (action) await action();
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut();
     router.replace("/login");
   }
 
+  // ---- Barrios ----
+
+  function openCreateBarrio() {
+    setEditingBarrioId(null);
+    setBarrioForm(emptyBarrioForm);
+    setBarrioModalOpen(true);
+  }
+
+  function openEditBarrio(b) {
+    setEditingBarrioId(b.id);
+    setBarrioForm({ nombre: b.nombre });
+    setBarrioModalOpen(true);
+  }
+
+  async function handleSaveBarrio(e) {
+    e.preventDefault();
+    setSavingBarrio(true);
+    setError("");
+    const headers = await authHeader();
+    const url = editingBarrioId ? `/api/admin/barrios/${editingBarrioId}` : "/api/admin/barrios";
+    const method = editingBarrioId ? "PUT" : "POST";
+    const res = await fetch(url, { method, headers, body: JSON.stringify(barrioForm) });
+    setSavingBarrio(false);
+    if (res.ok) {
+      setBarrioModalOpen(false);
+      loadAll();
+      showToast(editingBarrioId ? "Barrio actualizado." : "Barrio creado.");
+    } else {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error || "No se pudo guardar el Barrio.");
+    }
+  }
+
+  function requestDeleteBarrio(b) {
+    setConfirmState({
+      open: true,
+      title: "Eliminar Barrio",
+      message: `¿Eliminar el Barrio "${b.nombre}"? Esto solo funciona si ya no tiene jóvenes asignados.`,
+      danger: true,
+      onConfirm: async () => {
+        const headers = await authHeader();
+        const res = await fetch(`/api/admin/barrios/${b.id}`, { method: "DELETE", headers });
+        if (res.ok) {
+          loadAll();
+          showToast("Barrio eliminado.");
+        } else {
+          const body = await res.json().catch(() => ({}));
+          setError(body.error || "No se pudo eliminar el Barrio.");
+        }
+      },
+    });
+  }
+
   // ---- Líderes ----
 
   function openCreateLeader() {
     setEditingLeaderId(null);
-    setLeaderForm(emptyLeaderForm);
+    setLeaderForm({ ...emptyLeaderForm, barrio_id: barrios[0]?.id || "" });
     setLeaderModalOpen(true);
   }
 
   function openEditLeader(l) {
     setEditingLeaderId(l.id);
-    setLeaderForm({ nombre: l.nombre, email: l.email, password: "" });
+    setLeaderForm({ nombre: l.nombre, email: l.email, password: "", barrio_id: "" });
     setLeaderModalOpen(true);
   }
 
@@ -104,37 +207,105 @@ export default function Admin() {
         body: JSON.stringify(leaderForm),
       });
     }
-    setSavingLeader(false);
-    if (res.ok) {
-      setLeaderModalOpen(false);
-      loadAll();
-    } else {
+
+    if (!res.ok) {
+      setSavingLeader(false);
       const body = await res.json().catch(() => ({}));
       setError(body.error || "No se pudo guardar el líder.");
+      return;
+    }
+
+    if (!editingLeaderId && leaderForm.barrio_id) {
+      const created = await res.json();
+      await fetch("/api/admin/asignaciones", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ leader_id: created.id, barrio_id: leaderForm.barrio_id }),
+      });
+    }
+
+    setSavingLeader(false);
+    setLeaderModalOpen(false);
+    loadAll();
+    showToast(editingLeaderId ? "Líder actualizado." : "Líder creado.");
+  }
+
+  function requestDeleteLeader(l) {
+    setConfirmState({
+      open: true,
+      title: "Eliminar líder",
+      message: `¿Eliminar al líder ${l.nombre}? Perderá acceso de inmediato. Los jóvenes de sus Barrios NO se eliminan, siguen intactos.`,
+      danger: true,
+      onConfirm: async () => {
+        const headers = await authHeader();
+        const res = await fetch(`/api/admin/leaders/${l.id}`, { method: "DELETE", headers });
+        if (res.ok) {
+          loadAll();
+          showToast("Líder eliminado.");
+        } else {
+          setError("No se pudo eliminar al líder.");
+        }
+      },
+    });
+  }
+
+  function openAssignModal(leader) {
+    setAssigningLeader(leader);
+    const yaAsignados = new Set((leaderBarriosMap[leader.id] || []).map((b) => b.barrio_id));
+    const disponible = barrios.find((b) => !yaAsignados.has(b.id));
+    setAssignBarrioId(disponible?.id || "");
+    setAssignModalOpen(true);
+  }
+
+  async function handleAssign(e) {
+    e.preventDefault();
+    if (!assignBarrioId) return;
+    setAssigning(true);
+    setError("");
+    const headers = await authHeader();
+    const res = await fetch("/api/admin/asignaciones", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ leader_id: assigningLeader.id, barrio_id: assignBarrioId }),
+    });
+    setAssigning(false);
+    if (res.ok) {
+      setAssignModalOpen(false);
+      loadAll();
+      showToast(`Barrio asignado a ${assigningLeader.nombre}.`);
+    } else {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error || "No se pudo asignar el Barrio.");
     }
   }
 
-  async function handleDeleteLeader(l) {
-    const tieneJovenes = jovenes.some((j) => j.leader_id === l.id);
-    const aviso = tieneJovenes
-      ? `${l.nombre} tiene jóvenes registrados. Al eliminarlo, SUS CREDENCIALES TAMBIÉN SE BORRARÁN. ¿Continuar?`
-      : `¿Eliminar al líder ${l.nombre}?`;
-    if (!confirm(aviso)) return;
-
-    const headers = await authHeader();
-    const res = await fetch(`/api/admin/leaders/${l.id}`, { method: "DELETE", headers });
-    if (res.ok) {
-      loadAll();
-    } else {
-      setError("No se pudo eliminar al líder.");
-    }
+  function requestUnassign(leader, barrio) {
+    setConfirmState({
+      open: true,
+      title: "Quitar asignación",
+      message: `¿Quitar a ${leader.nombre} del Barrio "${barrio.nombre}"? Dejará de ver a esos jóvenes de inmediato.`,
+      danger: true,
+      onConfirm: async () => {
+        const headers = await authHeader();
+        const res = await fetch(
+          `/api/admin/asignaciones?leader_id=${leader.id}&barrio_id=${barrio.barrio_id}`,
+          { method: "DELETE", headers }
+        );
+        if (res.ok) {
+          loadAll();
+          showToast("Asignación eliminada.");
+        } else {
+          setError("No se pudo quitar la asignación.");
+        }
+      },
+    });
   }
 
   // ---- Jóvenes ----
 
   function openCreateJoven() {
     setEditingJovenId(null);
-    setJovenForm({ ...emptyJovenForm, leader_id: leaders[0]?.id || "" });
+    setJovenForm({ ...emptyJovenForm, barrio_id: barrios[0]?.id || "" });
     setJovenModalOpen(true);
   }
 
@@ -145,7 +316,7 @@ export default function Admin() {
       sistema_usuario: j.sistema_usuario,
       sistema_password: j.sistema_password,
       notas: j.notas || "",
-      leader_id: j.leader_id,
+      barrio_id: j.barrio_id,
     });
     setJovenModalOpen(true);
   }
@@ -162,21 +333,30 @@ export default function Admin() {
     if (res.ok) {
       setJovenModalOpen(false);
       loadAll();
+      showToast(editingJovenId ? "Cambios guardados." : "Joven agregado.");
     } else {
       const body = await res.json().catch(() => ({}));
       setError(body.error || "No se pudo guardar.");
     }
   }
 
-  async function handleDeleteJoven(id) {
-    if (!confirm("¿Eliminar estas credenciales?")) return;
-    const headers = await authHeader();
-    const res = await fetch(`/api/jovenes/${id}`, { method: "DELETE", headers });
-    if (res.ok) {
-      setJovenes((prev) => prev.filter((j) => j.id !== id));
-    } else {
-      setError("No se pudo eliminar.");
-    }
+  function requestDeleteJoven(j) {
+    setConfirmState({
+      open: true,
+      title: "Eliminar credenciales",
+      message: `¿Eliminar las credenciales de ${j.nombre}? Esta acción no se puede deshacer.`,
+      danger: true,
+      onConfirm: async () => {
+        const headers = await authHeader();
+        const res = await fetch(`/api/jovenes/${j.id}`, { method: "DELETE", headers });
+        if (res.ok) {
+          setJovenes((prev) => prev.filter((x) => x.id !== j.id));
+          showToast("Credenciales eliminadas.");
+        } else {
+          setError("No se pudo eliminar.");
+        }
+      },
+    });
   }
 
   function togglePw(id) {
@@ -186,204 +366,399 @@ export default function Admin() {
   if (session === undefined) return null;
 
   return (
-    <div className="container">
-      <div className="topbar">
-        <div>
-          <h1>Panel de administración</h1>
-          <p className="subtitle" style={{ margin: 0 }}>{session.user.email}</p>
-        </div>
-        <button className="btn-secondary" onClick={handleLogout}>Cerrar sesión</button>
-      </div>
-
-      {error && <p className="error">{error}</p>}
-
-      {/* ---- Líderes ---- */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="topbar" style={{ marginBottom: 8 }}>
-          <h2 style={{ margin: 0 }}>Líderes</h2>
-          <button className="btn-primary" onClick={openCreateLeader}>+ Agregar líder</button>
-        </div>
-
-        {loading ? (
-          <p>Cargando...</p>
-        ) : leaders.length === 0 ? (
-          <div className="empty-state">Aún no hay líderes registrados.</div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Correo</th>
-                <th># Jóvenes</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaders.map((l) => (
-                <tr key={l.id}>
-                  <td data-label="Nombre">{l.nombre}</td>
-                  <td data-label="Correo">{l.email}</td>
-                  <td data-label="# Jóvenes">{jovenes.filter((j) => j.leader_id === l.id).length}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="btn-secondary" onClick={() => openEditLeader(l)}>Editar</button>
-                      <button className="btn-danger" onClick={() => handleDeleteLeader(l)}>Eliminar</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* ---- Jóvenes ---- */}
-      <div className="card">
-        <div className="topbar" style={{ marginBottom: 8 }}>
-          <h2 style={{ margin: 0 }}>Todos los jóvenes</h2>
-          <button className="btn-primary" onClick={openCreateJoven} disabled={leaders.length === 0}>
-            + Agregar joven
-          </button>
-        </div>
-
-        {loading ? (
-          <p>Cargando...</p>
-        ) : jovenes.length === 0 ? (
-          <div className="empty-state">Aún no hay jóvenes registrados.</div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Líder</th>
-                <th>Usuario</th>
-                <th>Contraseña</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {jovenes.map((j) => (
-                <tr key={j.id}>
-                  <td data-label="Nombre">{j.nombre}</td>
-                  <td data-label="Líder">{leaderMap[j.leader_id]?.nombre || "—"}</td>
-                  <td data-label="Usuario">{j.sistema_usuario}</td>
-                  <td data-label="Contraseña">
-                    <div className="pw-cell">
-                      <span>{visiblePw[j.id] ? j.sistema_password : "••••••••"}</span>
-                      <button className="btn-link" onClick={() => togglePw(j.id)}>
-                        {visiblePw[j.id] ? "Ocultar" : "Ver"}
-                      </button>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="btn-secondary" onClick={() => openEditJoven(j)}>Editar</button>
-                      <button className="btn-danger" onClick={() => handleDeleteJoven(j.id)}>Eliminar</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* ---- Modal líder ---- */}
-      {leaderModalOpen && (
-        <div className="modal-backdrop" onClick={() => setLeaderModalOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editingLeaderId ? "Editar líder" : "Agregar líder"}</h2>
-            <form onSubmit={handleSaveLeader}>
-              <label>Nombre</label>
-              <input
-                required
-                value={leaderForm.nombre}
-                onChange={(e) => setLeaderForm({ ...leaderForm, nombre: e.target.value })}
-              />
-              <label>Correo</label>
-              <input
-                type="email"
-                required
-                disabled={!!editingLeaderId}
-                value={leaderForm.email}
-                onChange={(e) => setLeaderForm({ ...leaderForm, email: e.target.value })}
-              />
-              <label>{editingLeaderId ? "Nueva contraseña (opcional)" : "Contraseña"}</label>
-              <input
-                type="text"
-                required={!editingLeaderId}
-                value={leaderForm.password}
-                onChange={(e) => setLeaderForm({ ...leaderForm, password: e.target.value })}
-                placeholder={editingLeaderId ? "Dejar vacío para no cambiarla" : ""}
-              />
-              {error && <p className="error">{error}</p>}
-              <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => setLeaderModalOpen(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn-primary" disabled={savingLeader}>
-                  {savingLeader ? "Guardando..." : "Guardar"}
-                </button>
-              </div>
-            </form>
+    <>
+      <a href="#main-content" className="skip-link">Saltar al contenido</a>
+      <main id="main-content" className="container">
+        <div className="topbar">
+          <div>
+            <h1>Panel de administración</h1>
+            <p className="subtitle" style={{ margin: 0 }}>{session.user.email}</p>
           </div>
+          <button className="btn-secondary" onClick={handleLogout}>Cerrar sesión</button>
         </div>
-      )}
 
-      {/* ---- Modal joven ---- */}
-      {jovenModalOpen && (
-        <div className="modal-backdrop" onClick={() => setJovenModalOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editingJovenId ? "Editar joven" : "Agregar joven"}</h2>
-            <form onSubmit={handleSaveJoven}>
-              <label>Líder responsable</label>
-              <select
-                required
-                value={jovenForm.leader_id}
-                onChange={(e) => setJovenForm({ ...jovenForm, leader_id: e.target.value })}
-              >
-                <option value="" disabled>Selecciona un líder</option>
-                {leaders.map((l) => (
-                  <option key={l.id} value={l.id}>{l.nombre}</option>
+        {error && <p className="error" role="alert">{error}</p>}
+
+        {/* ---- Barrios ---- */}
+        <section className="card" style={{ marginBottom: 24 }} aria-labelledby="barrios-heading">
+          <div className="topbar" style={{ marginBottom: 8 }}>
+            <h2 id="barrios-heading" style={{ margin: 0 }}>Barrios</h2>
+            <button className="btn-primary" onClick={openCreateBarrio}>+ Agregar Barrio</button>
+          </div>
+
+          {loading ? (
+            <p>Cargando...</p>
+          ) : barrios.length === 0 ? (
+            <div className="empty-state">
+              Aún no hay Barrios. Crea el primero para poder registrar líderes y jóvenes.
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th># Jóvenes</th>
+                  <th># Líderes</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {barrios.map((b) => (
+                  <tr key={b.id}>
+                    <td data-label="Nombre">{b.nombre}</td>
+                    <td data-label="# Jóvenes">{jovenes.filter((j) => j.barrio_id === b.id).length}</td>
+                    <td data-label="# Líderes">
+                      {asignaciones.filter((a) => a.barrio_id === b.id).length}
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button className="btn-secondary" onClick={() => openEditBarrio(b)}>Editar</button>
+                        <button className="btn-danger" onClick={() => requestDeleteBarrio(b)}>Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
-              </select>
-              <label>Nombre del joven</label>
-              <input
-                required
-                value={jovenForm.nombre}
-                onChange={(e) => setJovenForm({ ...jovenForm, nombre: e.target.value })}
-              />
-              <label>Usuario (del sistema de jóvenes)</label>
-              <input
-                required
-                value={jovenForm.sistema_usuario}
-                onChange={(e) => setJovenForm({ ...jovenForm, sistema_usuario: e.target.value })}
-              />
-              <label>Contraseña (del sistema de jóvenes)</label>
-              <input
-                required
-                value={jovenForm.sistema_password}
-                onChange={(e) => setJovenForm({ ...jovenForm, sistema_password: e.target.value })}
-              />
-              <label>Notas (opcional)</label>
-              <textarea
-                rows={2}
-                value={jovenForm.notas}
-                onChange={(e) => setJovenForm({ ...jovenForm, notas: e.target.value })}
-              />
-              {error && <p className="error">{error}</p>}
-              <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={() => setJovenModalOpen(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn-primary" disabled={savingJoven}>
-                  {savingJoven ? "Guardando..." : "Guardar"}
-                </button>
-              </div>
-            </form>
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        {/* ---- Líderes ---- */}
+        <section className="card" style={{ marginBottom: 24 }} aria-labelledby="lideres-heading">
+          <div className="topbar" style={{ marginBottom: 8 }}>
+            <h2 id="lideres-heading" style={{ margin: 0 }}>Líderes</h2>
+            <button className="btn-primary" onClick={openCreateLeader} disabled={barrios.length === 0}>
+              + Agregar líder
+            </button>
           </div>
-        </div>
-      )}
-    </div>
+
+          {loading ? (
+            <p>Cargando...</p>
+          ) : leaders.length === 0 ? (
+            <div className="empty-state">Aún no hay líderes registrados.</div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Correo</th>
+                  <th>Barrios asignados</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaders.map((l) => (
+                  <tr key={l.id}>
+                    <td data-label="Nombre">{l.nombre}</td>
+                    <td data-label="Correo">{l.email}</td>
+                    <td data-label="Barrios asignados">
+                      <div className="badge-list">
+                        {(leaderBarriosMap[l.id] || []).map((b) => (
+                          <span key={b.barrio_id} className="badge">
+                            {b.nombre}
+                            <button
+                              type="button"
+                              className="badge-remove"
+                              onClick={() => requestUnassign(l, b)}
+                              aria-label={`Quitar a ${l.nombre} del Barrio ${b.nombre}`}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        <button className="btn-link" onClick={() => openAssignModal(l)}>+ Asignar Barrio</button>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button className="btn-secondary" onClick={() => openEditLeader(l)}>Editar</button>
+                        <button className="btn-danger" onClick={() => requestDeleteLeader(l)}>Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        {/* ---- Jóvenes ---- */}
+        <section className="card" aria-labelledby="jovenes-heading">
+          <div className="topbar" style={{ marginBottom: 8 }}>
+            <h2 id="jovenes-heading" style={{ margin: 0 }}>Todos los jóvenes</h2>
+            <button className="btn-primary" onClick={openCreateJoven} disabled={barrios.length === 0}>
+              + Agregar joven
+            </button>
+          </div>
+
+          {loading ? (
+            <p>Cargando...</p>
+          ) : jovenes.length === 0 ? (
+            <div className="empty-state">Aún no hay jóvenes registrados.</div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Barrio</th>
+                  <th>Usuario</th>
+                  <th>Contraseña</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {jovenes.map((j) => (
+                  <tr key={j.id}>
+                    <td data-label="Nombre">{j.nombre}</td>
+                    <td data-label="Barrio">{barrioMap[j.barrio_id]?.nombre || "—"}</td>
+                    <td data-label="Usuario">{j.sistema_usuario}</td>
+                    <td data-label="Contraseña">
+                      <div className="pw-cell">
+                        <span>{visiblePw[j.id] ? j.sistema_password : "••••••••"}</span>
+                        <button
+                          className="btn-link"
+                          onClick={() => togglePw(j.id)}
+                          aria-label={visiblePw[j.id] ? `Ocultar contraseña de ${j.nombre}` : `Mostrar contraseña de ${j.nombre}`}
+                        >
+                          {visiblePw[j.id] ? "Ocultar" : "Ver"}
+                        </button>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button className="btn-secondary" onClick={() => openEditJoven(j)}>Editar</button>
+                        <button className="btn-danger" onClick={() => requestDeleteJoven(j)}>Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        {/* ---- Modal Barrio ---- */}
+        {barrioModalOpen && (
+          <div className="modal-backdrop" onClick={() => setBarrioModalOpen(false)}>
+            <div
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="barrio-modal-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="barrio-modal-title">{editingBarrioId ? "Editar Barrio" : "Agregar Barrio"}</h2>
+              <form onSubmit={handleSaveBarrio} noValidate>
+                <label htmlFor="barrio-nombre">Nombre del Barrio</label>
+                <input
+                  id="barrio-nombre"
+                  required
+                  autoFocus
+                  value={barrioForm.nombre}
+                  onChange={(e) => setBarrioForm({ nombre: e.target.value })}
+                />
+                {error && <p className="error" role="alert">{error}</p>}
+                <div className="form-actions">
+                  <button type="button" className="btn-secondary" onClick={() => setBarrioModalOpen(false)}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={savingBarrio}>
+                    {savingBarrio ? "Guardando..." : "Guardar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ---- Modal líder ---- */}
+        {leaderModalOpen && (
+          <div className="modal-backdrop" onClick={() => setLeaderModalOpen(false)}>
+            <div
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="leader-modal-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="leader-modal-title">{editingLeaderId ? "Editar líder" : "Agregar líder"}</h2>
+              <form onSubmit={handleSaveLeader} noValidate>
+                <label htmlFor="leader-nombre">Nombre</label>
+                <input
+                  id="leader-nombre"
+                  required
+                  autoFocus
+                  value={leaderForm.nombre}
+                  onChange={(e) => setLeaderForm({ ...leaderForm, nombre: e.target.value })}
+                />
+                <label htmlFor="leader-email">Correo</label>
+                <input
+                  id="leader-email"
+                  type="email"
+                  required
+                  disabled={!!editingLeaderId}
+                  value={leaderForm.email}
+                  onChange={(e) => setLeaderForm({ ...leaderForm, email: e.target.value })}
+                />
+                <label htmlFor="leader-password">
+                  {editingLeaderId ? "Nueva contraseña (opcional)" : "Contraseña"}
+                </label>
+                <input
+                  id="leader-password"
+                  type="text"
+                  required={!editingLeaderId}
+                  value={leaderForm.password}
+                  onChange={(e) => setLeaderForm({ ...leaderForm, password: e.target.value })}
+                  placeholder={editingLeaderId ? "Dejar vacío para no cambiarla" : ""}
+                />
+                {!editingLeaderId && (
+                  <>
+                    <label htmlFor="leader-barrio">Barrio inicial (opcional)</label>
+                    <select
+                      id="leader-barrio"
+                      value={leaderForm.barrio_id}
+                      onChange={(e) => setLeaderForm({ ...leaderForm, barrio_id: e.target.value })}
+                    >
+                      <option value="">Sin asignar por ahora</option>
+                      {barrios.map((b) => (
+                        <option key={b.id} value={b.id}>{b.nombre}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                {error && <p className="error" role="alert">{error}</p>}
+                <div className="form-actions">
+                  <button type="button" className="btn-secondary" onClick={() => setLeaderModalOpen(false)}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={savingLeader}>
+                    {savingLeader ? "Guardando..." : "Guardar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ---- Modal asignar Barrio a líder ---- */}
+        {assignModalOpen && (
+          <div className="modal-backdrop" onClick={() => setAssignModalOpen(false)}>
+            <div
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="assign-modal-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="assign-modal-title">Asignar Barrio a {assigningLeader?.nombre}</h2>
+              <form onSubmit={handleAssign} noValidate>
+                <label htmlFor="assign-barrio">Barrio</label>
+                <select
+                  id="assign-barrio"
+                  required
+                  autoFocus
+                  value={assignBarrioId}
+                  onChange={(e) => setAssignBarrioId(e.target.value)}
+                >
+                  <option value="" disabled>Selecciona un Barrio</option>
+                  {barrios
+                    .filter((b) => !(leaderBarriosMap[assigningLeader?.id] || []).some((x) => x.barrio_id === b.id))
+                    .map((b) => (
+                      <option key={b.id} value={b.id}>{b.nombre}</option>
+                    ))}
+                </select>
+                {error && <p className="error" role="alert">{error}</p>}
+                <div className="form-actions">
+                  <button type="button" className="btn-secondary" onClick={() => setAssignModalOpen(false)}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={assigning}>
+                    {assigning ? "Asignando..." : "Asignar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ---- Modal joven ---- */}
+        {jovenModalOpen && (
+          <div className="modal-backdrop" onClick={() => setJovenModalOpen(false)}>
+            <div
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="joven-modal-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="joven-modal-title">{editingJovenId ? "Editar joven" : "Agregar joven"}</h2>
+              <form onSubmit={handleSaveJoven} noValidate>
+                <label htmlFor="joven-admin-barrio">Barrio</label>
+                <select
+                  id="joven-admin-barrio"
+                  required
+                  autoFocus
+                  value={jovenForm.barrio_id}
+                  onChange={(e) => setJovenForm({ ...jovenForm, barrio_id: e.target.value })}
+                >
+                  <option value="" disabled>Selecciona un Barrio</option>
+                  {barrios.map((b) => (
+                    <option key={b.id} value={b.id}>{b.nombre}</option>
+                  ))}
+                </select>
+                <label htmlFor="joven-admin-nombre">Nombre del joven</label>
+                <input
+                  id="joven-admin-nombre"
+                  required
+                  value={jovenForm.nombre}
+                  onChange={(e) => setJovenForm({ ...jovenForm, nombre: e.target.value })}
+                />
+                <label htmlFor="joven-admin-usuario">Usuario (del sistema de jóvenes)</label>
+                <input
+                  id="joven-admin-usuario"
+                  required
+                  value={jovenForm.sistema_usuario}
+                  onChange={(e) => setJovenForm({ ...jovenForm, sistema_usuario: e.target.value })}
+                />
+                <label htmlFor="joven-admin-password">Contraseña (del sistema de jóvenes)</label>
+                <input
+                  id="joven-admin-password"
+                  required
+                  value={jovenForm.sistema_password}
+                  onChange={(e) => setJovenForm({ ...jovenForm, sistema_password: e.target.value })}
+                />
+                <label htmlFor="joven-admin-notas">Notas (opcional)</label>
+                <textarea
+                  id="joven-admin-notas"
+                  rows={2}
+                  value={jovenForm.notas}
+                  onChange={(e) => setJovenForm({ ...jovenForm, notas: e.target.value })}
+                />
+                {error && <p className="error" role="alert">{error}</p>}
+                <div className="form-actions">
+                  <button type="button" className="btn-secondary" onClick={() => setJovenModalOpen(false)}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={savingJoven}>
+                    {savingJoven ? "Guardando..." : "Guardar"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        <ConfirmDialog
+          open={confirmState.open}
+          title={confirmState.title}
+          message={confirmState.message}
+          danger={confirmState.danger}
+          onConfirm={handleConfirm}
+          onCancel={closeConfirm}
+        />
+
+        <Toast toast={toast} onClose={clearToast} />
+      </main>
+    </>
   );
 }
