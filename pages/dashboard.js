@@ -6,6 +6,7 @@ import { useToast } from "../lib/useToast";
 import Toast from "../components/Toast";
 import ConfirmDialog from "../components/ConfirmDialog";
 import LogoMark from "../components/LogoMark";
+import SearchBar from "../components/SearchBar";
 import { isStaffRole } from "../lib/roles";
 
 const emptyForm = { nombre: "", sistema_usuario: "", sistema_password: "", notas: "", barrio_id: "" };
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const [session, setSession] = useState(undefined);
   const [misBarrios, setMisBarrios] = useState([]);
   const [jovenes, setJovenes] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [visiblePw, setVisiblePw] = useState({});
@@ -141,6 +143,14 @@ export default function Dashboard() {
   if (session === undefined) return null;
 
   const sinBarrio = !loading && misBarrios.length === 0;
+  const term = search.trim().toLowerCase();
+  const jovenesFiltrados = term
+    ? jovenes.filter(
+        (j) =>
+          j.nombre.toLowerCase().includes(term) ||
+          j.sistema_usuario.toLowerCase().includes(term)
+      )
+    : jovenes;
 
   return (
     <>
@@ -173,12 +183,18 @@ export default function Dashboard() {
             </p>
           )}
 
+          {!loading && jovenes.length > 0 && (
+            <SearchBar value={search} onChange={setSearch} placeholder="Buscar por nombre o usuario..." id="buscar-jovenes" />
+          )}
+
           {loading ? (
             <p>Cargando...</p>
           ) : jovenes.length === 0 ? (
             <div className="empty-state">
               Aún no has registrado credenciales. Usa &quot;+ Agregar joven&quot; para empezar.
             </div>
+          ) : jovenesFiltrados.length === 0 ? (
+            <div className="empty-state">No hay jóvenes que coincidan con &quot;{search}&quot;.</div>
           ) : (
             <table>
               <thead>
@@ -191,7 +207,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {jovenes.map((j) => (
+                {jovenesFiltrados.map((j) => (
                   <tr key={j.id}>
                     <td data-label="Nombre">{j.nombre}</td>
                     <td data-label="Usuario del sistema">{j.sistema_usuario}</td>

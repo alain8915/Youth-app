@@ -6,6 +6,7 @@ import { useToast } from "../lib/useToast";
 import Toast from "../components/Toast";
 import ConfirmDialog from "../components/ConfirmDialog";
 import LogoMark from "../components/LogoMark";
+import SearchBar from "../components/SearchBar";
 import { isStaffRole } from "../lib/roles";
 
 const emptyLeaderForm = { nombre: "", email: "", password: "", barrio_id: "", esEstaca: false };
@@ -21,6 +22,9 @@ export default function Admin() {
   const [jovenes, setJovenes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [leaderSearch, setLeaderSearch] = useState("");
+  const [jovenSearch, setJovenSearch] = useState("");
+  const [jovenBarrioFilter, setJovenBarrioFilter] = useState("");
   const [visiblePw, setVisiblePw] = useState({});
   const [confirmState, setConfirmState] = useState({ open: false });
 
@@ -106,6 +110,26 @@ export default function Admin() {
     });
     return map;
   }, [asignaciones]);
+
+  const leadersFiltrados = useMemo(() => {
+    const term = leaderSearch.trim().toLowerCase();
+    if (!term) return leaders;
+    return leaders.filter(
+      (l) => l.nombre.toLowerCase().includes(term) || l.email.toLowerCase().includes(term)
+    );
+  }, [leaders, leaderSearch]);
+
+  const jovenesFiltrados = useMemo(() => {
+    const term = jovenSearch.trim().toLowerCase();
+    return jovenes.filter((j) => {
+      const coincideTexto =
+        !term ||
+        j.nombre.toLowerCase().includes(term) ||
+        j.sistema_usuario.toLowerCase().includes(term);
+      const coincideBarrio = !jovenBarrioFilter || j.barrio_id === jovenBarrioFilter;
+      return coincideTexto && coincideBarrio;
+    });
+  }, [jovenes, jovenSearch, jovenBarrioFilter]);
 
   function closeConfirm() {
     setConfirmState({ open: false });
@@ -441,10 +465,21 @@ export default function Admin() {
             </button>
           </div>
 
+          {!loading && leaders.length > 0 && (
+            <SearchBar
+              value={leaderSearch}
+              onChange={setLeaderSearch}
+              placeholder="Buscar líder por nombre o correo..."
+              id="buscar-lideres"
+            />
+          )}
+
           {loading ? (
             <p>Cargando...</p>
           ) : leaders.length === 0 ? (
             <div className="empty-state">Aún no hay líderes registrados.</div>
+          ) : leadersFiltrados.length === 0 ? (
+            <div className="empty-state">No hay líderes que coincidan con &quot;{leaderSearch}&quot;.</div>
           ) : (
             <table>
               <thead>
@@ -456,7 +491,7 @@ export default function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {leaders.map((l) => (
+                {leadersFiltrados.map((l) => (
                   <tr key={l.id}>
                     <td data-label="Nombre">
                       {l.nombre}
@@ -507,10 +542,33 @@ export default function Admin() {
             </button>
           </div>
 
+          {!loading && jovenes.length > 0 && (
+            <div className="filters-row">
+              <SearchBar
+                value={jovenSearch}
+                onChange={setJovenSearch}
+                placeholder="Buscar joven por nombre o usuario..."
+                id="buscar-jovenes-admin"
+              />
+              <select
+                aria-label="Filtrar por Barrio"
+                value={jovenBarrioFilter}
+                onChange={(e) => setJovenBarrioFilter(e.target.value)}
+              >
+                <option value="">Todos los Barrios</option>
+                {barrios.map((b) => (
+                  <option key={b.id} value={b.id}>{b.nombre}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {loading ? (
             <p>Cargando...</p>
           ) : jovenes.length === 0 ? (
             <div className="empty-state">Aún no hay jóvenes registrados.</div>
+          ) : jovenesFiltrados.length === 0 ? (
+            <div className="empty-state">Ningún joven coincide con ese filtro.</div>
           ) : (
             <table>
               <thead>
@@ -523,7 +581,7 @@ export default function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {jovenes.map((j) => (
+                {jovenesFiltrados.map((j) => (
                   <tr key={j.id}>
                     <td data-label="Nombre">{j.nombre}</td>
                     <td data-label="Barrio">{barrioMap[j.barrio_id]?.nombre || "—"}</td>
