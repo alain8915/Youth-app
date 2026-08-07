@@ -93,9 +93,10 @@ export default function Login() {
   return (
     <main className="login-wrapper">
       <div className="card login-card">
-        <div className="logo-mark">
+        <div className="login-card-header">
           <LogoMark />
         </div>
+        <div className="login-card-body">
         <div className="tabs" role="tablist" aria-label="Modo de acceso">
           <button
             type="button"
@@ -224,6 +225,7 @@ export default function Login() {
             </form>
           </>
         )}
+        </div>
       </div>
     </main>
   );

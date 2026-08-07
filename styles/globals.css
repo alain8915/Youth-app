@@ -40,18 +40,25 @@ body {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: linear-gradient(180deg, var(--navy) 0%, var(--navy) 220px, var(--cream) 220px);
+  background: var(--cream);
 }
 
 .login-card {
   width: 100%;
   max-width: 380px;
+  padding: 0;
+  overflow: hidden;
 }
 
-.logo-mark {
+.login-card-header {
+  background: var(--navy);
+  padding: 28px 24px 20px;
   display: flex;
   justify-content: center;
-  margin-bottom: 12px;
+}
+
+.login-card-body {
+  padding: 24px;
 }
 
 .tabs {
@@ -268,8 +275,11 @@ select:focus-visible {
   h1 { font-size: 19px; }
   h2 { font-size: 16px; }
 
-  .login-wrapper {
-    background: linear-gradient(180deg, var(--navy) 0%, var(--navy) 180px, var(--cream) 180px);
+  .login-card-header {
+    padding: 22px 20px 16px;
+  }
+  .login-card-body {
+    padding: 20px;
   }
 
   /* La barra superior (título + botones) pasa de fila a columna */
