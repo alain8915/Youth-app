@@ -5,6 +5,7 @@ import { useEscapeClose } from "../lib/useEscapeClose";
 import { useToast } from "../lib/useToast";
 import Toast from "../components/Toast";
 import ConfirmDialog from "../components/ConfirmDialog";
+import LogoMark from "../components/LogoMark";
 
 const emptyForm = { nombre: "", sistema_usuario: "", sistema_password: "", notas: "", barrio_id: "" };
 
@@ -145,12 +146,15 @@ export default function Dashboard() {
       <a href="#main-content" className="skip-link">Saltar al contenido</a>
       <main id="main-content" className="container">
         <div className="topbar">
-          <div>
-            <h1>Credenciales de mis jóvenes</h1>
-            <p className="subtitle" style={{ margin: 0 }}>
-              {session.user.email}
-              {misBarrios.length > 0 && ` · ${misBarrios.map((b) => b.nombre).join(", ")}`}
-            </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <LogoMark size={36} />
+            <div>
+              <h1>Credenciales de mis jóvenes</h1>
+              <p className="subtitle" style={{ margin: 0 }}>
+                {session.user.email}
+                {misBarrios.length > 0 && ` · ${misBarrios.map((b) => b.nombre).join(", ")}`}
+              </p>
+            </div>
           </div>
           <div className="actions">
             <button className="btn-primary" onClick={openCreate} disabled={sinBarrio}>+ Agregar joven</button>

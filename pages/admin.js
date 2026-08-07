@@ -5,6 +5,7 @@ import { useEscapeClose } from "../lib/useEscapeClose";
 import { useToast } from "../lib/useToast";
 import Toast from "../components/Toast";
 import ConfirmDialog from "../components/ConfirmDialog";
+import LogoMark from "../components/LogoMark";
 
 const emptyLeaderForm = { nombre: "", email: "", password: "", barrio_id: "" };
 const emptyBarrioForm = { nombre: "" };
@@ -370,9 +371,12 @@ export default function Admin() {
       <a href="#main-content" className="skip-link">Saltar al contenido</a>
       <main id="main-content" className="container">
         <div className="topbar">
-          <div>
-            <h1>Panel de administración</h1>
-            <p className="subtitle" style={{ margin: 0 }}>{session.user.email}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <LogoMark size={36} />
+            <div>
+              <h1>Panel de administración</h1>
+              <p className="subtitle" style={{ margin: 0 }}>{session.user.email}</p>
+            </div>
           </div>
           <button className="btn-secondary" onClick={handleLogout}>Cerrar sesión</button>
         </div>

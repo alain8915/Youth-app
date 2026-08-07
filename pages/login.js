@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
+import LogoMark from "../components/LogoMark";
 
 const emptySignup = { nombre: "", email: "", password: "", codigo: "", barrio_id: "" };
 
@@ -92,6 +93,9 @@ export default function Login() {
   return (
     <main className="login-wrapper">
       <div className="card login-card">
+        <div className="logo-mark">
+          <LogoMark />
+        </div>
         <div className="tabs" role="tablist" aria-label="Modo de acceso">
           <button
             type="button"
