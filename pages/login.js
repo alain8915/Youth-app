@@ -94,7 +94,7 @@ export default function Login() {
     <main className="login-wrapper">
       <div className="card login-card">
         <div className="login-card-header">
-          <LogoMark />
+          <LogoMark variant="onDark" />
         </div>
         <div className="login-card-body">
         <div className="tabs" role="tablist" aria-label="Modo de acceso">

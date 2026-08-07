@@ -1,6 +1,14 @@
 // Ilustración original (no es un logotipo oficial de ninguna institución):
 // un amanecer sobre montañas, en la paleta azul marino + dorado de la app.
-export default function LogoMark({ size = 56 }) {
+//
+// variant="onLight" (default): para usarse sobre fondo blanco/claro
+//   (ej. los encabezados de los paneles de líder/admin) — montañas en azul marino.
+// variant="onDark": para usarse sobre fondo azul marino (ej. el header
+//   del login) — montañas en tono claro para que no se pierdan.
+export default function LogoMark({ size = 56, variant = "onLight" }) {
+  const mountainFront = variant === "onDark" ? "#f8f6f0" : "#1e3a5f";
+  const mountainShadow = variant === "onDark" ? "#c7d3de" : "#14293f";
+
   return (
     <svg
       width={size}
@@ -20,8 +28,8 @@ export default function LogoMark({ size = 56 }) {
         <line x1="19.5" y1="11.5" x2="23" y2="15" />
         <line x1="44.5" y1="11.5" x2="41" y2="15" />
       </g>
-      <path d="M2 52 L20 30 L30 42 L38 32 L62 52 Z" fill="#1e3a5f" />
-      <path d="M2 52 L20 30 L30 42 L26 46 L14 52 Z" fill="#14293f" />
+      <path d="M2 52 L20 30 L30 42 L38 32 L62 52 Z" fill={mountainFront} />
+      <path d="M2 52 L20 30 L30 42 L26 46 L14 52 Z" fill={mountainShadow} />
     </svg>
   );
 }
