@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 import LogoMark from "../components/LogoMark";
+import { isStaffRole } from "../lib/roles";
 
 const emptySignup = { nombre: "", email: "", password: "", codigo: "", barrio_id: "" };
 
@@ -23,7 +24,7 @@ export default function Login() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return;
       const role = session.user.app_metadata?.role;
-      router.replace(role === "admin" ? "/admin" : "/dashboard");
+      router.replace(isStaffRole(role) ? "/admin" : "/dashboard");
     });
   }, [router]);
 
@@ -55,7 +56,7 @@ export default function Login() {
       return;
     }
     const role = data.session.user.app_metadata?.role;
-    router.replace(role === "admin" ? "/admin" : "/dashboard");
+    router.replace(isStaffRole(role) ? "/admin" : "/dashboard");
   }
 
   async function handleSignup(e) {

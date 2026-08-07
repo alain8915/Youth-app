@@ -9,8 +9,10 @@ export default async function handler(req, res) {
     const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
     if (error) return res.status(500).json({ error: error.message });
 
+    // Esta lista es de líderes de barrio únicamente. Las cuentas de
+    // admin/estaca (nivel superior) no aparecen aquí.
     const leaders = data.users
-      .filter((u) => u.app_metadata?.role !== "admin")
+      .filter((u) => !["admin", "estaca"].includes(u.app_metadata?.role))
       .map((u) => ({
         id: u.id,
         email: u.email,
@@ -21,7 +23,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "POST") {
-    const { nombre, email, password } = req.body || {};
+    const { nombre, email, password, esEstaca } = req.body || {};
     if (!nombre?.trim() || !email?.trim() || !password?.trim()) {
       return res.status(400).json({ error: "Nombre, correo y contraseña son obligatorios." });
     }
@@ -29,11 +31,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres." });
     }
 
+    const role = esEstaca ? "estaca" : "leader";
+
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email: email.trim(),
       password,
       email_confirm: true,
-      app_metadata: { role: "leader", nombre: nombre.trim() },
+      app_metadata: { role, nombre: nombre.trim() },
     });
 
     if (error) return res.status(500).json({ error: error.message });
@@ -42,6 +46,7 @@ export default async function handler(req, res) {
       id: data.user.id,
       email: data.user.email,
       nombre: nombre.trim(),
+      role,
     });
   }
 

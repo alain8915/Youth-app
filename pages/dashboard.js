@@ -6,6 +6,7 @@ import { useToast } from "../lib/useToast";
 import Toast from "../components/Toast";
 import ConfirmDialog from "../components/ConfirmDialog";
 import LogoMark from "../components/LogoMark";
+import { isStaffRole } from "../lib/roles";
 
 const emptyForm = { nombre: "", sistema_usuario: "", sistema_password: "", notas: "", barrio_id: "" };
 
@@ -29,7 +30,7 @@ export default function Dashboard() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         router.replace("/login");
-      } else if (session.user.app_metadata?.role === "admin") {
+      } else if (isStaffRole(session.user.app_metadata?.role)) {
         router.replace("/admin");
       } else {
         setSession(session);

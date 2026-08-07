@@ -6,8 +6,9 @@ import { useToast } from "../lib/useToast";
 import Toast from "../components/Toast";
 import ConfirmDialog from "../components/ConfirmDialog";
 import LogoMark from "../components/LogoMark";
+import { isStaffRole } from "../lib/roles";
 
-const emptyLeaderForm = { nombre: "", email: "", password: "", barrio_id: "" };
+const emptyLeaderForm = { nombre: "", email: "", password: "", barrio_id: "", esEstaca: false };
 const emptyBarrioForm = { nombre: "" };
 const emptyJovenForm = { nombre: "", sistema_usuario: "", sistema_password: "", notas: "", barrio_id: "" };
 
@@ -49,7 +50,7 @@ export default function Admin() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         router.replace("/login");
-      } else if (session.user.app_metadata?.role !== "admin") {
+      } else if (!isStaffRole(session.user.app_metadata?.role)) {
         router.replace("/dashboard");
       } else {
         setSession(session);
@@ -216,7 +217,7 @@ export default function Admin() {
       return;
     }
 
-    if (!editingLeaderId && leaderForm.barrio_id) {
+    if (!editingLeaderId && !leaderForm.esEstaca && leaderForm.barrio_id) {
       const created = await res.json();
       await fetch("/api/admin/asignaciones", {
         method: "POST",
@@ -374,7 +375,7 @@ export default function Admin() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <LogoMark size={36} />
             <div>
-              <h1>Panel de administración</h1>
+              <h1>{session.user.app_metadata?.role === "estaca" ? "Panel de Estaca" : "Panel de administración"}</h1>
               <p className="subtitle" style={{ margin: 0 }}>{session.user.email}</p>
             </div>
           </div>
@@ -617,17 +618,30 @@ export default function Admin() {
                 />
                 {!editingLeaderId && (
                   <>
-                    <label htmlFor="leader-barrio">Barrio inicial (opcional)</label>
-                    <select
-                      id="leader-barrio"
-                      value={leaderForm.barrio_id}
-                      onChange={(e) => setLeaderForm({ ...leaderForm, barrio_id: e.target.value })}
-                    >
-                      <option value="">Sin asignar por ahora</option>
-                      {barrios.map((b) => (
-                        <option key={b.id} value={b.id}>{b.nombre}</option>
-                      ))}
-                    </select>
+                    <label className="checkbox-label" htmlFor="leader-es-estaca">
+                      <input
+                        id="leader-es-estaca"
+                        type="checkbox"
+                        checked={leaderForm.esEstaca}
+                        onChange={(e) => setLeaderForm({ ...leaderForm, esEstaca: e.target.checked, barrio_id: "" })}
+                      />
+                      Es líder de Estaca (ve y administra todos los Barrios)
+                    </label>
+                    {!leaderForm.esEstaca && (
+                      <>
+                        <label htmlFor="leader-barrio">Barrio inicial (opcional)</label>
+                        <select
+                          id="leader-barrio"
+                          value={leaderForm.barrio_id}
+                          onChange={(e) => setLeaderForm({ ...leaderForm, barrio_id: e.target.value })}
+                        >
+                          <option value="">Sin asignar por ahora</option>
+                          {barrios.map((b) => (
+                            <option key={b.id} value={b.id}>{b.nombre}</option>
+                          ))}
+                        </select>
+                      </>
+                    )}
                   </>
                 )}
                 {error && <p className="error" role="alert">{error}</p>}

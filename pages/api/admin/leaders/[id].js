@@ -11,7 +11,12 @@ export default async function handler(req, res) {
     const updates = {};
 
     if (nombre?.trim()) {
-      updates.app_metadata = { role: "leader", nombre: nombre.trim() };
+      // Se preserva el rol actual del usuario (leader/estaca) en vez de
+      // forzarlo, para no degradar por accidente a un líder de estaca.
+      const { data: existing, error: fetchError } = await supabaseAdmin.auth.admin.getUserById(id);
+      if (fetchError) return res.status(500).json({ error: fetchError.message });
+      const currentRole = existing.user.app_metadata?.role || "leader";
+      updates.app_metadata = { role: currentRole, nombre: nombre.trim() };
     }
     if (password?.trim()) {
       if (password.length < 6) {

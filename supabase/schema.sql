@@ -61,8 +61,8 @@ create policy "barrios_select_authenticated"
 
 create policy "barrios_admin_write"
   on barrios for all
-  using ( (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' )
-  with check ( (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' );
+  using ( (auth.jwt() -> 'app_metadata' ->> 'role') = any (array['admin', 'estaca']) )
+  with check ( (auth.jwt() -> 'app_metadata' ->> 'role') = any (array['admin', 'estaca']) );
 
 -- Un líder puede ver a qué Barrio(s) está asignado él mismo. Solo el
 -- admin puede crear/borrar asignaciones (es decir, asignar o quitar
@@ -73,8 +73,8 @@ create policy "leader_barrios_select_own"
 
 create policy "leader_barrios_admin_all"
   on leader_barrios for all
-  using ( (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' )
-  with check ( (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' );
+  using ( (auth.jwt() -> 'app_metadata' ->> 'role') = any (array['admin', 'estaca']) )
+  with check ( (auth.jwt() -> 'app_metadata' ->> 'role') = any (array['admin', 'estaca']) );
 
 -- Un líder ve/crea/edita/borra únicamente jóvenes de los Barrios a los
 -- que está actualmente asignado (vía leader_barrios). Si cambia de
@@ -109,8 +109,8 @@ create policy "leaders_delete_by_barrio"
 -- El admin ve y administra todo, sin importar el Barrio.
 create policy "admin_full_access_jovenes"
   on jovenes for all
-  using ( (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' )
-  with check ( (auth.jwt() -> 'app_metadata' ->> 'role') = 'admin' );
+  using ( (auth.jwt() -> 'app_metadata' ->> 'role') = any (array['admin', 'estaca']) )
+  with check ( (auth.jwt() -> 'app_metadata' ->> 'role') = any (array['admin', 'estaca']) );
 
 -- Mantiene updated_at al día automáticamente
 create or replace function set_updated_at()
