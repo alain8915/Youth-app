@@ -212,6 +212,15 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spa
 }
 .badge-remove:hover { background: rgba(150,116,26,0.18); }
 
+.badge-estaca {
+  background: var(--navy);
+  color: #fff;
+  margin-left: 8px;
+  padding: 3px 9px;
+  font-size: 11px;
+  vertical-align: middle;
+}
+
 /* ============ Accesibilidad: foco visible por teclado ============ */
 /* Solo se muestra el anillo de foco cuando se navega con teclado (Tab),
    no al hacer clic con mouse — así no se ve "sucio" pero sí es navegable. */

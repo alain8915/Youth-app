@@ -9,14 +9,16 @@ export default async function handler(req, res) {
     const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
     if (error) return res.status(500).json({ error: error.message });
 
-    // Esta lista es de líderes de barrio únicamente. Las cuentas de
-    // admin/estaca (nivel superior) no aparecen aquí.
+    // Esta lista incluye líderes de barrio y de estaca (ambos se
+    // administran desde aquí). El admin raíz (bootstrap, vía SQL) es el
+    // único que no aparece — ese se sigue gestionando por fuera de la app.
     const leaders = data.users
-      .filter((u) => !["admin", "estaca"].includes(u.app_metadata?.role))
+      .filter((u) => u.app_metadata?.role !== "admin")
       .map((u) => ({
         id: u.id,
         email: u.email,
         nombre: u.app_metadata?.nombre || "(sin nombre)",
+        role: u.app_metadata?.role === "estaca" ? "estaca" : "leader",
       }));
 
     return res.status(200).json(leaders);

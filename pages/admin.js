@@ -185,7 +185,7 @@ export default function Admin() {
 
   function openEditLeader(l) {
     setEditingLeaderId(l.id);
-    setLeaderForm({ nombre: l.nombre, email: l.email, password: "", barrio_id: "" });
+    setLeaderForm({ nombre: l.nombre, email: l.email, password: "", barrio_id: "", esEstaca: l.role === "estaca" });
     setLeaderModalOpen(true);
   }
 
@@ -200,7 +200,11 @@ export default function Admin() {
       res = await fetch(`/api/admin/leaders/${editingLeaderId}`, {
         method: "PUT",
         headers,
-        body: JSON.stringify({ nombre: leaderForm.nombre, password: leaderForm.password || undefined }),
+        body: JSON.stringify({
+          nombre: leaderForm.nombre,
+          password: leaderForm.password || undefined,
+          esEstaca: leaderForm.esEstaca,
+        }),
       });
     } else {
       res = await fetch("/api/admin/leaders", {
@@ -454,25 +458,32 @@ export default function Admin() {
               <tbody>
                 {leaders.map((l) => (
                   <tr key={l.id}>
-                    <td data-label="Nombre">{l.nombre}</td>
+                    <td data-label="Nombre">
+                      {l.nombre}
+                      {l.role === "estaca" && <span className="badge badge-estaca">Estaca</span>}
+                    </td>
                     <td data-label="Correo">{l.email}</td>
                     <td data-label="Barrios asignados">
-                      <div className="badge-list">
-                        {(leaderBarriosMap[l.id] || []).map((b) => (
-                          <span key={b.barrio_id} className="badge">
-                            {b.nombre}
-                            <button
-                              type="button"
-                              className="badge-remove"
-                              onClick={() => requestUnassign(l, b)}
-                              aria-label={`Quitar a ${l.nombre} del Barrio ${b.nombre}`}
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                        <button className="btn-link" onClick={() => openAssignModal(l)}>+ Asignar Barrio</button>
-                      </div>
+                      {l.role === "estaca" ? (
+                        <span className="subtitle" style={{ margin: 0 }}>Todos los Barrios</span>
+                      ) : (
+                        <div className="badge-list">
+                          {(leaderBarriosMap[l.id] || []).map((b) => (
+                            <span key={b.barrio_id} className="badge">
+                              {b.nombre}
+                              <button
+                                type="button"
+                                className="badge-remove"
+                                onClick={() => requestUnassign(l, b)}
+                                aria-label={`Quitar a ${l.nombre} del Barrio ${b.nombre}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                          <button className="btn-link" onClick={() => openAssignModal(l)}>+ Asignar Barrio</button>
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div className="row-actions">
@@ -616,32 +627,39 @@ export default function Admin() {
                   onChange={(e) => setLeaderForm({ ...leaderForm, password: e.target.value })}
                   placeholder={editingLeaderId ? "Dejar vacío para no cambiarla" : ""}
                 />
-                {!editingLeaderId && (
+                <label className="checkbox-label" htmlFor="leader-es-estaca">
+                  <input
+                    id="leader-es-estaca"
+                    type="checkbox"
+                    checked={leaderForm.esEstaca}
+                    onChange={(e) => setLeaderForm({ ...leaderForm, esEstaca: e.target.checked, barrio_id: "" })}
+                  />
+                  Es líder de Estaca (ve y administra todos los Barrios)
+                </label>
+                {editingLeaderId && leaderForm.esEstaca && (
+                  <p className="subtitle" style={{ margin: "4px 0 0", fontSize: 12 }}>
+                    Ya no necesita Barrios asignados individualmente — ve todos automáticamente.
+                  </p>
+                )}
+                {editingLeaderId && !leaderForm.esEstaca && (
+                  <p className="subtitle" style={{ margin: "4px 0 0", fontSize: 12 }}>
+                    Al quitarle Estaca, solo verá los Barrios que tenga asignados en la tabla de Líderes
+                    (asígnale uno si todavía no tiene ninguno).
+                  </p>
+                )}
+                {!editingLeaderId && !leaderForm.esEstaca && (
                   <>
-                    <label className="checkbox-label" htmlFor="leader-es-estaca">
-                      <input
-                        id="leader-es-estaca"
-                        type="checkbox"
-                        checked={leaderForm.esEstaca}
-                        onChange={(e) => setLeaderForm({ ...leaderForm, esEstaca: e.target.checked, barrio_id: "" })}
-                      />
-                      Es líder de Estaca (ve y administra todos los Barrios)
-                    </label>
-                    {!leaderForm.esEstaca && (
-                      <>
-                        <label htmlFor="leader-barrio">Barrio inicial (opcional)</label>
-                        <select
-                          id="leader-barrio"
-                          value={leaderForm.barrio_id}
-                          onChange={(e) => setLeaderForm({ ...leaderForm, barrio_id: e.target.value })}
-                        >
-                          <option value="">Sin asignar por ahora</option>
-                          {barrios.map((b) => (
-                            <option key={b.id} value={b.id}>{b.nombre}</option>
-                          ))}
-                        </select>
-                      </>
-                    )}
+                    <label htmlFor="leader-barrio">Barrio inicial (opcional)</label>
+                    <select
+                      id="leader-barrio"
+                      value={leaderForm.barrio_id}
+                      onChange={(e) => setLeaderForm({ ...leaderForm, barrio_id: e.target.value })}
+                    >
+                      <option value="">Sin asignar por ahora</option>
+                      {barrios.map((b) => (
+                        <option key={b.id} value={b.id}>{b.nombre}</option>
+                      ))}
+                    </select>
                   </>
                 )}
                 {error && <p className="error" role="alert">{error}</p>}
